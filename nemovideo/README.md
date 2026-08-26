@@ -14,12 +14,19 @@ NemoVideo drafts are Draft Protocol V3 markup rather than an opaque render, so
 
 | Component | What it does |
 |-|-|
-| `skills/nemovideo` | Teaches the agent the correct authoring order, the Draft Protocol V3 rules, and how to handle billing, retries and version conflicts |
+| `skills/nemovideo` | The ordinary project workflow: create a project, import or generate media, save, preview, export, and read credits |
+| `skills/draft-v3-authoring` | Draft Protocol V3 itself — timelines, clips, tracks, subtitles, transitions, editable data and render components, and repairing a save that failed validation |
+| `skills/platform-reference-materials` | Reusable reference materials: create, attach, preview, publish, roll back, unpublish |
 | `mcp.json` | Declares the NemoVideo remote MCP server (Streamable HTTP) |
 
 There is no bundled runtime: no local command, no npm or pip dependency, no
 background process. The plugin is a manifest plus documentation, so it works on
 every platform the host runs on.
+
+The three skills are copies. They are authored and versioned in the
+`nemo-skills` repository and imported by `scripts/sync-skills.py`, which records
+the versions it took in `skills-source.json`. Edit them upstream and re-run the
+script; a change made here would be overwritten on the next import.
 
 ## Install
 

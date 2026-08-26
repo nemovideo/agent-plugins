@@ -1,122 +1,86 @@
 ---
 name: nemovideo
-description: Create, edit, preview and export videos with the NemoVideo MCP server. Use when the user wants to make or change a video, generate video/music/sound-effect/speech clips, import media into a video project, watch or inspect a draft, export a finished video file, or check their NemoVideo credit balance.
+description: >-
+  Create, edit, preview, inspect, and export editable videos with the NemoVideo
+  MCP tools. Use when a user wants to make or change a video, import or generate
+  media, save a Draft Protocol V3 timeline, watch or inspect the result, export
+  a finished file, or check NemoVideo credits.
 ---
 
-# NemoVideo
+# NemoVideo MCP workflow
 
-NemoVideo turns a prompt into an **editable** video project. The draft is Draft
-Protocol V3 markup that you write and rewrite, not an opaque blob, so an edit is
-a markup change rather than a full regeneration.
+Use this skill for ordinary NemoVideo project work. For reusable text,
+graphics, effect presets, or other Platform reference material, use
+`platform-reference-materials` instead.
 
-The `nemovideo` MCP server is remote and account-bound. The first tool call
-triggers an OAuth sign-in; every tool then acts on the connected account only.
+When authoring or modifying a Draft Protocol V3 template beyond the invariants
+below, invoke `$draft-v3-authoring`. Extract the exact element structure,
+timeline rule, and edit/repair procedure needed for the requested change, then
+return to this workflow for saving, inspection, preview, or export. If that
+Skill is not available, use only the invariants below and do not invent detailed
+element syntax; ask the user to install the companion Skill for advanced edits.
 
 ## Standard workflow
 
-1. `create_video_project` — returns `project_id`, `session_id`, `version: 0`.
-   Do this before anything that writes a draft. Keep all three; later tools
-   reject a `session_id` from a different project.
-2. `upload_asset` — once per piece of media the draft references. Returns
-   `asset_url`; use that exact string in the draft.
-3. `generate_video` / `generate_audio` — only when the user needs new footage,
-   music, a sound effect, or narration. These are billed. Skip them for drafts
-   built from uploaded media, text, and shapes.
-4. `save_v3_draft` — validates and persists the whole `main_template`. Pass the
-   `version` you last saw as `base_version`.
-5. `preview_video` — the user watches the saved draft. Use
-   `get_project_frame` instead when *you* need to check the layout.
-6. `render_video` then `get_render_status` — only when the user wants a
-   downloadable file. Requires a Starter plan or above.
+1. Call `create_video_project` and retain its `project_id`, `session_id`, and
+   `version`.
+2. Import user media with `upload_asset`, or create new media with
+   `generate_video` or `generate_audio` only when requested. Use every returned
+   media URL exactly; never construct one from a filename.
+3. Author the complete Draft Protocol V3 template and call `save_v3_draft`
+   with the last observed version as `base_version`.
+4. Call `preview_video` when the user should watch the saved draft. Use
+   `get_project_frame` only to inspect a particular visual result yourself.
+5. Call `render_video`, then poll `get_render_status`, only when the user asks
+   for a downloadable video file.
 
-## Draft Protocol V3 essentials
+Before a partial edit, call `get_video_project` and preserve unrelated tracks,
+clips, expressions, plugins, and user-authored content. `save_v3_draft`
+replaces the complete template.
 
-One `<draft fps width height duration>` root; `duration`, `in` and `out` are
-milliseconds. It holds `<track id>` elements, each holding `<clip id in out>`
-elements whose content is ordinary HTML. Clip ids are unique across all tracks,
-and clips within a track should not overlap.
+## Draft V3 invariants
 
-```xml
-<draft fps="30" width="1280" height="720" duration="5000">
-  <track id="text">
-    <clip id="hello" in="0" out="5000"><div>Hello world</div></clip>
-  </track>
-</draft>
-```
+- The root is `<draft fps width height duration>` and its direct children are
+  typed `<track id type>` elements containing uniquely identified
+  `<clip id in out>` elements.
+- Time values are milliseconds. Clips on the same track must not overlap; use
+  separate tracks for simultaneous layers.
+- Put media attributes on the media child inside a clip, not on `<clip>`.
+- Use only media URLs returned by NemoVideo tools. Do not copy Cicada-local
+  paths, invent CDN URLs, or translate a returned URL into another scheme.
+- Preserve advanced V3 constructs already present. Do not simplify a draft by
+  deleting bindings, data carriers, render bodies, motion, animation, Lottie,
+  or Three.js elements merely because the edit is small.
 
-Media is referenced only by the `asset://` URL that `upload_asset` returned, for
-example `<img src="asset://image/my-photo" />`. Do not build an `asset://` URL
-by hand: the stored filename can differ from the uploaded one.
+## Billed actions and retries
 
-Beyond static markup the protocol supports `:prop="expr"` bindings, `*if` and
-`*for`, `{expr}` interpolation, `<data>` and `<styles>` carriers, `<script>` and
-`<render lang="jsx">`, and the `<lottie>`, `<motion>`, `<anime>`, `<gsap>` and
-`<three>` plugins. When editing an existing draft, preserve the constructs
-already in it — deleting expressions and plugins to write plain markup silently
-degrades the project. A `<script>` body may not loop unboundedly and may not
-mention `fetch`, `document`, `window`, `process`, `require`, `eval` or
-`Function`; prefer an expression wherever one would do.
+`generate_video` and `generate_audio` spend credits. Use one caller-stable
+`idempotency_key` for one logical generation and reuse that same key only when
+retrying the same request. A new key represents a new billed operation.
 
-`save_v3_draft` replaces the entire template, so read the current one with
-`get_video_project` before a partial edit.
+Video and music generation may be asynchronous. Poll
+`get_generation_status` with the returned generation identifier and type until
+it succeeds or reaches a terminal failure. Do not report generated media as
+placed in the project until a saved draft references it.
 
-## Preview, frame, and render are three different things
+Use `get_credits` only for balance or quota questions. Do not interpret a
+successful generation request as proof that an export or timeline edit exists.
 
-| Need | Tool | Costs credits | Produces a file |
-|-|-|-|-|
-| User watches the draft | `preview_video` | No | No |
-| You verify your own layout | `get_project_frame` | No | No |
-| User wants a video file | `render_video` | Plan required | Yes |
+## Failure handling
 
-`get_project_frame` takes a **frame index**, not milliseconds: multiply seconds
-by the draft's `fps`. Never describe a video or send a single frame in place of
-calling `preview_video` when the user asked to watch it. Both read what
-`save_v3_draft` last stored, so save first.
+- Missing OAuth scope: tell the user to reconnect and approve the required
+  permission; do not retry unchanged.
+- Insufficient credits or plan restriction: report the returned limitation and
+  let the user decide whether to top up or upgrade.
+- Validation failure: correct the template or input before retrying.
+- Version conflict: reload the project, preserve the user's intended change,
+  and save against the new version.
+- Unavailable Gateway: report that the operation did not complete; never claim
+  a project, generation, save, render, or publication succeeded from a request
+  attempt alone.
 
-## Billing and idempotency
+## Completion check
 
-`generate_video` and `generate_audio` consume credits and require a
-caller-stable `idempotency_key`. **Reuse the same key when retrying the same
-user request** — a new key on a retry charges the account twice. Use
-`get_credits` when the user asks about credits, balance, or remaining quota.
-
-`generate_video` and `generate_audio` with `kind=music` return immediately;
-poll `get_generation_status` with the matching `generation_type` until the
-status is terminal — `succeeded`, or any of `failed`, `canceled`, `cancelled`
-and `timed_out`. `kind=sound_effect` and `kind=speech` complete in the initial
-call and have no status to poll.
-
-One `generate_video` call produces at most 15 seconds. Cover a longer sequence
-with several clips rather than one long request.
-
-## Handling failures
-
-- `insufficient_scope` — the account did not grant that permission at sign-in.
-  Tell the user to reconnect and approve it; do not retry.
-- Insufficient credits (402) or plan required (403) — a deterministic refusal.
-  Relay the message and tell the user to top up or upgrade at
-  https://www.nemovideo.com/pricing ; retrying cannot succeed.
-- A request the model cannot satisfy (422), such as a clip longer than the
-  15-second limit — relay the constraint and offer a request that fits, for
-  example several shorter clips. Retrying the same arguments cannot succeed.
-- Version conflict on save — re-read with `get_video_project` and resave using
-  the returned `version`, keeping the user's intent.
-- A draft rejected by validation — fix the markup against the rules above.
-  Do not resubmit the same template unchanged.
-
-## Tools
-
-| Tool | Purpose |
-|-|-|
-| `get_credits` | Credit balance: available, frozen, total granted, total consumed |
-| `create_video_project` | New project plus its first editing session |
-| `get_video_project` | Current draft, resolver context, and `version` |
-| `save_v3_draft` | Validate and persist the full draft with optimistic locking |
-| `preview_video` | Play the saved draft for the user |
-| `get_project_frame` | One rendered frame as an image, for self-checking |
-| `upload_asset` | Import a file into the project and get its `asset://` URL |
-| `generate_video` | Billed text-to-video generation |
-| `generate_audio` | Billed music, sound effect, or speech generation |
-| `get_generation_status` | Progress and result of a video or music generation |
-| `render_video` | Start an export to a video file |
-| `get_render_status` | Export progress and the download URL |
+State separately what was generated, what was saved to the editable draft,
+what was previewed, and what was exported. Claim only outcomes proven by the
+corresponding tool result.

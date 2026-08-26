@@ -10,7 +10,7 @@
     {
       "name": "nemovideo",
       "source": "nemovideo",
-      "description": "Turn a prompt into an editable video draft: generate video, music and speech, import media, preview it in the conversation, and export the finished file.",
+      "description": "Create and precisely edit videos with NemoVideo: author Draft Protocol V3 timelines, generate or import media, preview and export the result, and build reusable platform reference materials.",
       "category": "Content Creation",
       "homepage": "https://www.nemovideo.com",
       "license": "UNLICENSED"
