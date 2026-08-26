@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check this plugin against the Cursor plugin submission checklist.
+"""Check every plugin here against the Cursor plugin submission checklist.
 
 Run from the repository root: python3 scripts/validate.py
 Exits non-zero on any failure so it can gate a commit or CI job.
@@ -10,13 +10,19 @@ import os
 import re
 import sys
 
-MANIFEST = ".cursor-plugin/plugin.json"
+MARKETPLACE_MANIFEST = ".cursor-plugin/marketplace.json"
+PLUGIN_MANIFEST = ".cursor-plugin/plugin.json"
+MCP_CONFIG = "mcp.json"
+SKILLS_DIR = "skills"
+SKILL_FILE = "SKILL.md"
+
 NAME_PATTERN = r"[a-z0-9]([a-z0-9.-]*[a-z0-9])?"
 DESCRIPTION_MIN = 10
 DESCRIPTION_MAX = 500
 SKILL_FRONTMATTER_FIELDS = {"name", "description"}
 FRONTMATTER_PATTERN = r"^---\n(.*?)\n---\n"
 VARIABLE_PATTERN = r"\$\{([A-Za-z0-9_]+)\}"
+
 SCANNED_SUFFIXES = (".md", ".json", ".txt")
 SCANNED_NAMES = ("LICENSE",)
 CREDENTIAL_PATTERN = re.compile(
@@ -38,43 +44,112 @@ def bad(message: str) -> None:
     print(f"  FAIL  {message}")
 
 
-def check_manifest() -> dict:
-    print("== manifest ==")
-    manifest = json.load(open(MANIFEST))
-    ok(f"{MANIFEST} is valid JSON")
-
-    name = manifest.get("name", "")
-    if re.fullmatch(NAME_PATTERN, name):
-        ok(f"name '{name}' is lowercase kebab-case")
+def check_name(value: str, label: str) -> None:
+    if re.fullmatch(NAME_PATTERN, value):
+        ok(f"{label} '{value}' is lowercase kebab-case")
     else:
-        bad(f"name '{name}' must be lowercase kebab-case and start/end alphanumeric")
+        bad(f"{label} '{value}' must be lowercase kebab-case and start/end alphanumeric")
 
-    description = manifest.get("description", "")
-    if DESCRIPTION_MIN <= len(description) <= DESCRIPTION_MAX:
-        ok(f"description present ({len(description)} chars)")
+
+def check_description(value: str, label: str) -> None:
+    if DESCRIPTION_MIN <= len(value) <= DESCRIPTION_MAX:
+        ok(f"{label} description present ({len(value)} chars)")
     else:
-        bad(f"description length {len(description)} outside {DESCRIPTION_MIN}-{DESCRIPTION_MAX}")
+        bad(f"{label} description length {len(value)} outside {DESCRIPTION_MIN}-{DESCRIPTION_MAX}")
 
-    logo = manifest.get("logo", "")
-    if logo.startswith(("/", "http")) or ".." in logo:
-        bad(f"logo '{logo}' must be a relative in-repo path")
-    elif os.path.isfile(logo):
-        ok(f"logo '{logo}' exists ({os.path.getsize(logo)} bytes)")
-    else:
-        bad(f"logo '{logo}' not found")
 
+def check_relative_paths(manifest: dict, label: str) -> None:
     for key, value in manifest.items():
         if isinstance(value, str) and not value.startswith("http"):
             if value.startswith("/") or ".." in value:
-                bad(f"manifest field '{key}' uses an absolute or escaping path: {value}")
-    ok("no absolute or '..' paths in manifest")
-    return manifest
+                bad(f"{label} field '{key}' uses an absolute or escaping path: {value}")
+    ok(f"{label} has no absolute or '..' paths")
 
 
-def check_mcp(manifest: dict) -> None:
-    print("== mcp.json ==")
-    servers = json.load(open("mcp.json")).get("mcpServers", {})
-    ok(f"mcp.json is valid JSON, declares {len(servers)} server: {', '.join(servers)}")
+def check_marketplace() -> list[dict]:
+    print(f"== {MARKETPLACE_MANIFEST} ==")
+    manifest = json.load(open(MARKETPLACE_MANIFEST))
+    ok("valid JSON")
+
+    check_name(manifest.get("name", ""), "marketplace name")
+
+    owner = manifest.get("owner") or {}
+    if owner.get("name"):
+        ok(f"owner '{owner['name']}' declared")
+    else:
+        bad("owner.name is required")
+
+    entries = manifest.get("plugins") or []
+    if entries:
+        ok(f"{len(entries)} plugin entr(y/ies) listed")
+    else:
+        bad("plugins array is required and must not be empty")
+
+    names = [entry.get("name", "") for entry in entries]
+    if len(names) == len(set(names)):
+        ok("plugin names are unique")
+    else:
+        bad(f"duplicate plugin names: {[n for n in names if names.count(n) > 1]}")
+
+    return entries
+
+
+def check_plugin(entry: dict) -> None:
+    source = entry.get("source") or entry.get("name", "")
+    print(f"== plugin '{entry.get('name', '?')}' at {source}/ ==")
+
+    if source.startswith("/") or ".." in source:
+        bad(f"source '{source}' must be a relative in-repo path")
+        return
+    if not os.path.isdir(source):
+        bad(f"source directory '{source}' not found")
+        return
+
+    manifest_path = os.path.join(source, PLUGIN_MANIFEST)
+    if not os.path.isfile(manifest_path):
+        bad(f"{manifest_path} not found")
+        return
+    manifest = json.load(open(manifest_path))
+    ok(f"{manifest_path} is valid JSON")
+
+    if manifest.get("name") != entry.get("name"):
+        bad(f"manifest name '{manifest.get('name')}' differs from marketplace entry '{entry.get('name')}'")
+    else:
+        ok("manifest name matches the marketplace entry")
+
+    check_name(manifest.get("name", ""), "plugin name")
+    check_description(manifest.get("description", ""), "plugin")
+    check_relative_paths(manifest, "plugin manifest")
+
+    logo = manifest.get("logo", "")
+    if not logo:
+        ok("no logo declared (optional)")
+    elif logo.startswith(("/", "http")) or ".." in logo:
+        bad(f"logo '{logo}' must be a relative in-repo path")
+    else:
+        logo_path = os.path.join(source, logo)
+        if os.path.isfile(logo_path):
+            ok(f"logo '{logo}' exists ({os.path.getsize(logo_path)} bytes)")
+        else:
+            bad(f"logo '{logo}' not found at {logo_path}")
+
+    if not os.path.isfile(os.path.join(source, "README.md")):
+        bad(f"{source}/README.md is required to document usage and configuration")
+    else:
+        ok("README.md present")
+
+    check_mcp(source, manifest)
+    check_skills(source)
+
+
+def check_mcp(source: str, manifest: dict) -> None:
+    path = os.path.join(source, MCP_CONFIG)
+    if not os.path.isfile(path):
+        ok(f"no {MCP_CONFIG} (plugin ships no MCP server)")
+        return
+
+    servers = json.load(open(path)).get("mcpServers", {})
+    ok(f"{MCP_CONFIG} is valid JSON, declares {len(servers)} server: {', '.join(servers)}")
 
     used: set[str] = set()
     for entry in servers.values():
@@ -85,19 +160,23 @@ def check_mcp(manifest: dict) -> None:
     declared = set((manifest.get("variables") or {}).get("properties", {}))
     undeclared = used - declared
     if undeclared:
-        bad(f"mcp.json uses variables not declared in the manifest: {sorted(undeclared)}")
+        bad(f"{MCP_CONFIG} uses variables not declared in the manifest: {sorted(undeclared)}")
     else:
         ok("every ${VAR} used in mcp.json is declared in the manifest")
 
 
-def check_skills() -> None:
-    print("== skills ==")
+def check_skills(source: str) -> None:
+    root = os.path.join(source, SKILLS_DIR)
+    if not os.path.isdir(root):
+        ok(f"no {SKILLS_DIR}/ (plugin ships no skills)")
+        return
+
     count = 0
-    for dirpath, _, filenames in os.walk("skills"):
-        if "SKILL.md" not in filenames:
+    for dirpath, _, filenames in os.walk(root):
+        if SKILL_FILE not in filenames:
             continue
         count += 1
-        path = os.path.join(dirpath, "SKILL.md")
+        path = os.path.join(dirpath, SKILL_FILE)
         matched = re.match(FRONTMATTER_PATTERN, open(path).read(), re.S)
         if not matched:
             bad(f"{path} is missing YAML frontmatter")
@@ -113,13 +192,13 @@ def check_skills() -> None:
             bad(f"{path} frontmatter missing {sorted(SKILL_FRONTMATTER_FIELDS - present)}")
 
     if count:
-        ok(f"{count} skill(s) discovered under skills/")
+        ok(f"{count} skill(s) discovered")
     else:
-        bad("no skills found under skills/")
+        bad(f"{root}/ exists but contains no {SKILL_FILE}")
 
 
 def check_hygiene() -> None:
-    print("== hygiene ==")
+    print("== repository hygiene ==")
     for dirpath, dirnames, filenames in os.walk("."):
         dirnames[:] = [d for d in dirnames if d != ".git"]
         for filename in filenames:
@@ -134,9 +213,8 @@ def check_hygiene() -> None:
 
 
 def main() -> int:
-    manifest = check_manifest()
-    check_mcp(manifest)
-    check_skills()
+    for entry in check_marketplace():
+        check_plugin(entry)
     check_hygiene()
     print(f"\nRESULT: {len(failures)} failure(s)")
     return 1 if failures else 0

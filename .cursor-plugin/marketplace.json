@@ -1,0 +1,19 @@
+{
+  "name": "nemovideo-agent-plugins",
+  "owner": {
+    "name": "NemoVideo"
+  },
+  "metadata": {
+    "description": "NemoVideo agent plugins for Cursor and other Model Context Protocol hosts"
+  },
+  "plugins": [
+    {
+      "name": "nemovideo",
+      "source": "nemovideo",
+      "description": "Turn a prompt into an editable video draft: generate video, music and speech, import media, preview it in the conversation, and export the finished file.",
+      "category": "Content Creation",
+      "homepage": "https://www.nemovideo.com",
+      "license": "UNLICENSED"
+    }
+  ]
+}

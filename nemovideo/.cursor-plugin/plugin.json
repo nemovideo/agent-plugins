@@ -6,7 +6,7 @@
     "name": "NemoVideo"
   },
   "homepage": "https://www.nemovideo.com",
-  "repository": "https://github.com/nemovideo/nemovideo-cursor-plugin",
+  "repository": "https://github.com/nemovideo/agent-plugins",
   "license": "UNLICENSED",
   "keywords": [
     "video",
