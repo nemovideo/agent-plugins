@@ -1,0 +1,22 @@
+NemoVideo Cursor Plugin — Proprietary License
+
+Copyright (c) 2026 NemoVideo. All rights reserved.
+
+This package contains plugin manifests, skill documentation and brand assets
+owned by NemoVideo. It is published so that Cursor (Anysphere, Inc.) and other
+Model Context Protocol hosts can review, distribute and run the NemoVideo
+plugin, and so that end users can install and run it.
+
+Permission is granted to reproduce and distribute this package unmodified for
+that purpose, and to end users to install and run it within a Model Context
+Protocol host.
+
+No other rights are granted. The package may not be modified, reverse
+engineered, sublicensed, or used to build a derivative or competing service
+without prior written permission from NemoVideo.
+
+Use of the NemoVideo service reached through this plugin is additionally
+governed by the NemoVideo Terms of Use and Privacy Policy.
+
+THE PACKAGE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED.

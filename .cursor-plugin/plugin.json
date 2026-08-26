@@ -1,0 +1,22 @@
+{
+  "name": "nemovideo",
+  "version": "0.1.0",
+  "description": "Turn a prompt into an editable video draft: generate video, music and speech, import media, preview it in the conversation, and export the finished file.",
+  "author": {
+    "name": "NemoVideo"
+  },
+  "homepage": "https://www.nemovideo.com",
+  "repository": "https://github.com/nemovideo/nemovideo-cursor-plugin",
+  "license": "UNLICENSED",
+  "keywords": [
+    "video",
+    "ai-video",
+    "text-to-video",
+    "video-editing",
+    "text-to-speech",
+    "music-generation",
+    "render",
+    "nemovideo"
+  ],
+  "logo": "assets/logo.png"
+}
