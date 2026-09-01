@@ -2,9 +2,10 @@
 name: nemovideo
 description: >-
   Create, edit, preview, inspect, and export editable videos with the NemoVideo
-  MCP tools. Use when a user wants to make or change a video, import or generate
-  media, save a Draft Protocol V3 timeline, watch or inspect the result, export
-  a finished file, or check NemoVideo credits.
+  MCP tools, either by delegating the whole job to NemoVideo's own video agent
+  or by authoring the draft directly. Use when a user wants to make or change a
+  video, import or generate media, save a Draft Protocol V3 timeline, watch or
+  inspect the result, export a finished file, or check NemoVideo credits.
 ---
 
 # NemoVideo MCP workflow
@@ -19,6 +20,76 @@ timeline rule, and edit/repair procedure needed for the requested change, then
 return to this workflow for saving, inspection, preview, or export. If that
 Skill is not available, use only the invariants below and do not invent detailed
 element syntax; ask the user to install the companion Skill for advanced edits.
+
+## Choosing between delegation and authoring
+
+**If `delegate_to_nemo_agent` is not in your tool list, this account has not
+granted delegation.** Skip to the standard workflow below and author the draft
+yourself; the rest of this guide works without it.
+
+Prefer `delegate_to_nemo_agent` when the user describes a video rather than a
+specific markup change. It hands the task to NemoVideo's own agent, which plans
+the video, authors and saves the draft, places or generates the media, and
+checks its own result. That agent knows Draft Protocol V3, the asset pipeline,
+and the generation models directly.
+
+Author the draft yourself for a change you can already express exactly — recolor
+a title, trim a clip, swap one asset. Both act on the same project, so they
+combine freely in either order.
+
+## Delegation workflow
+
+1. Call `create_video_project`; the agent needs a project and session.
+2. Call `upload_asset` for each piece of user media first, and keep the `file_id`
+   and `mime_type` it returns for each one.
+3. Call `delegate_to_nemo_agent` with `session_id` and a `message` describing
+   the video. It returns a turn carrying its `turn_id`. Pass every piece of
+   reference media as `attachments`, quoting back that `file_id` and
+   `mime_type`, and say in the request what each one is for ("open on the first
+   photo", "keep this character", "extend this clip"). The agent decides from
+   the text which is a first frame, a style reference or a source video, so an
+   attachment nothing in the text accounts for is one it has no instruction for.
+   An exact opening or closing frame cannot be combined with reference material
+   of any kind — not a reference image, not a source video, not a reference
+   audio. Ask for one or the other in a single video; asking for both fails the
+   generation outright.
+4. Attachments are what let the delegated agent see a file. They are not how a
+   draft references media: if you write the draft yourself with `save_v3_draft`
+   instead of delegating, use the `asset_url` from the same upload.
+5. Branch on `turn_state`, not on `ok` and not on prose. `running` is the normal
+   first answer, because the wait budget is seconds and a turn takes minutes:
+   the turn was accepted and nothing exists yet. Poll `get_nemo_agent_turn` with
+   that `session_id` and `turn_id` at a human pace, relay the `text` events and
+   the tools it has run, and describe no result while it runs.
+6. `awaiting_input` means the agent stopped to ask something. The question is in
+   the arguments of the last `ask_question` tool call. Relay it, then answer with
+   another `delegate_to_nemo_agent` in the same session. **Nothing was
+   finished**: do not claim a video or offer to export one. This case ends
+   through the runtime's ordinary success path, which is why it is reported as
+   its own state rather than left for you to spot.
+7. `stopped` means every part of the turn reached a terminal status. That is not
+   the same as delivered, so read `runtime_statuses` and `events` before saying
+   anything to the user.
+
+   - A `user_abort` status means the turn was cancelled. That is the
+     cancellation landing, not a fault.
+   - An `error` event, or a status naming a failure, means the agent did not
+     deliver. Report it and do not claim a saved draft.
+   - Otherwise the draft is saved. Confirm it with `get_video_project` and check
+     `has_draft` before describing a video.
+
+The status vocabulary belongs to the runtime and can grow, so `stopped` is
+deliberately not "succeeded": treat a status you do not recognise as "read the
+events" rather than as either outcome.
+
+`ok` means the outcome a tool names has been achieved, not that the call reached
+the server. A running turn and a turn waiting on a question both report it as
+`false` with no error, and a turn keeps running after the call returns — that is
+progress, not failure. Use `cancel_nemo_agent_turn` when the user abandons the
+request; a generation already paid for still completes and is still charged, so
+read the turn afterwards rather than assuming it stopped cleanly. If a delegate
+call reports that the session already has a turn running, nothing was accepted
+and there is no turn to poll.
 
 ## Standard workflow
 
