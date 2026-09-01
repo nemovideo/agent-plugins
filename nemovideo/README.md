@@ -14,7 +14,7 @@ NemoVideo drafts are Draft Protocol V3 markup rather than an opaque render, so
 
 | Component | What it does |
 |-|-|
-| `skills/nemovideo` | The ordinary project workflow: create a project, import or generate media, save, preview, export, and read credits |
+| `skills/nemovideo` | The ordinary project workflow: create a project, import or generate media, save, preview, export, and read credits — and when to hand the whole job to NemoVideo's own agent instead |
 | `skills/draft-v3-authoring` | Draft Protocol V3 itself — timelines, clips, tracks, subtitles, transitions, editable data and render components, and repairing a save that failed validation |
 | `skills/platform-reference-materials` | Reusable reference materials: create, attach, preview, publish, roll back, unpublish |
 | `mcp.json` | Declares the NemoVideo remote MCP server (Streamable HTTP) |
@@ -84,6 +84,23 @@ use. Revoke access at any time from your NemoVideo account settings, or with
 | `get_generation_status` | Progress and result of a generation | `video:read` / `audio:read` |
 | `render_video` | Start an export to a video file | `render:write` |
 | `get_render_status` | Export progress and the download URL | `render:read` |
+| `delegate_to_nemo_agent` | Hand the whole video task to NemoVideo's own agent | `agent:chat` |
+| `get_nemo_agent_turn` | Read a delegated turn: its events, the tools it ran, whether it stopped | `agent:chat` |
+| `cancel_nemo_agent_turn` | Cancel a delegated turn that is still running | `agent:chat` |
+
+The three `agent:chat` tools appear only when the connected account granted that
+scope, so most sessions will not see them and the skill falls back to authoring
+the draft directly. When they are available, describing a video is usually
+better than writing the markup yourself: NemoVideo's agent plans the video,
+authors and saves the draft, places or generates the media, and checks its own
+result. Author the draft yourself for an edit you can already express exactly.
+
+To give that agent reference media — a reference image, an opening frame, a
+source video to extend — upload it with `upload_asset` and pass the `file_id`
+and `mime_type` it returns in the delegate call's `attachments`, then say in the
+request what each one is for — the agent reads the roles off that text. The
+`asset_url` from the same upload is for the other path: writing the draft
+yourself with `save_v3_draft`.
 
 `preview_video` returns an interactive player through the
 [MCP Apps extension](https://modelcontextprotocol.io/extensions/apps/overview),
