@@ -25,7 +25,8 @@ element syntax; ask the user to install the companion Skill for advanced edits.
 
 **If `delegate_to_nemo_agent` is not in your tool list, this account has not
 granted delegation.** Skip to the standard workflow below and author the draft
-yourself; the rest of this guide works without it.
+yourself; the rest of this guide works without it. The save rules in this
+section still apply to you — other people write the same project.
 
 Prefer `delegate_to_nemo_agent` when the user describes a video rather than a
 specific markup change. It hands the task to NemoVideo's own agent, which plans
@@ -34,8 +35,40 @@ checks its own result. That agent knows Draft Protocol V3, the asset pipeline,
 and the generation models directly.
 
 Author the draft yourself for a change you can already express exactly — recolor
-a title, trim a clip, swap one asset. Both act on the same project, so they
-combine freely in either order.
+a title, trim a clip, swap one asset. Both act on the same project, and
+`save_v3_draft` replaces the complete template, so two writers on one draft
+delete each other's work rather than merging it.
+
+You cannot see every writer. A turn you started, you can poll. A turn the user
+started in the NemoVideo app, or one whose `turn_id` you no longer have, you
+cannot, and `get_video_project` does not report one. `turn_state` says where a
+turn is, not whether writing has stopped: a turn can report a terminal state and
+still have a write in flight. So do not try to establish that the draft is idle.
+Save defensively instead:
+
+- While a turn you started is still `running`, do not save at all. Poll it.
+- Otherwise read with `get_video_project` immediately before saving, apply your
+  change to the template that read returned, and save against its `version`.
+  Never submit a template you composed against an older read: the version check
+  passes on a fresh `base_version` whatever the body holds, so a stale body
+  saves cleanly and deletes everything that arrived in between.
+- A version conflict means the project changed between your read and your save.
+  That is not always another editor — ordinary background work on the project's
+  files moves the same version. The conflict carries the current template and
+  version, so apply your change to those and save again rather than reading the
+  project a second time. If your change no longer has anything to apply to, ask
+  the user rather than guessing. If conflicts keep coming, something is writing
+  steadily — say so instead of looping.
+- A save that succeeds proves only that nothing landed between your read and
+  your save. A later write can still land, including a turn's own last write
+  after it reports terminal, so read the project again before telling the user
+  what the draft now contains.
+
+`awaiting_input` is neither a finished turn nor a quiet draft: it is a turn
+waiting on an answer, and a write can still land. It is not `running`, so the
+rules above let you save in it — but answering afterwards puts a second writer
+back on the draft. Pick one before you promise the user anything: answer the
+question first, or tell the user the question is being dropped and then save.
 
 ## Delegation workflow
 
@@ -43,7 +76,12 @@ combine freely in either order.
 2. Call `upload_asset` for each piece of user media first, and keep the `file_id`
    and `mime_type` it returns for each one.
 3. Call `delegate_to_nemo_agent` with `session_id` and a `message` describing
-   the video. It returns a turn carrying its `turn_id`. Pass every piece of
+   the video. It returns a turn carrying its `turn_id`. Supply your own only to
+   keep the handle when your side can time out, and then use a new id for each
+   new request — reuse one only to retry a call whose result you never saw. A
+   repeated id is treated as a repeat of that earlier message: the new request
+   is dropped, the tool still reports a running turn, and polling returns the
+   earlier turn, which can read as finished. Pass every piece of
    reference media as `attachments`, quoting back that `file_id` and
    `mime_type`, and say in the request what each one is for ("open on the first
    photo", "keep this character", "extend this clip"). The agent decides from
@@ -76,7 +114,10 @@ combine freely in either order.
    - An `error` event, or a status naming a failure, means the agent did not
      deliver. Report it and do not claim a saved draft.
    - Otherwise the draft is saved. Confirm it with `get_video_project` and check
-     `has_draft` before describing a video.
+     `has_draft` before describing a video. The turn's own last write can land
+     after it reports terminal, so read once more before describing the
+     timeline, and do not conclude from `events` that the turn produced nothing
+     — it is capped and may be truncated.
 
 The status vocabulary belongs to the runtime and can grow, so `stopped` is
 deliberately not "succeeded": treat a status you do not recognise as "read the
@@ -98,8 +139,9 @@ and there is no turn to poll.
 2. Import user media with `upload_asset`, or create new media with
    `generate_video` or `generate_audio` only when requested. Use every returned
    media URL exactly; never construct one from a filename.
-3. Author the complete Draft Protocol V3 template and call `save_v3_draft`
-   with the last observed version as `base_version`.
+3. Author the complete Draft Protocol V3 template, then follow the save rules
+   above: read the project immediately before saving and use that read's
+   `version` as `base_version`, not one observed earlier.
 4. Call `preview_video` when the user should watch the saved draft. Use
    `get_project_frame` only to inspect a particular visual result yourself.
 5. Call `render_video`, then poll `get_render_status`, only when the user asks
@@ -144,8 +186,9 @@ successful generation request as proof that an export or timeline edit exists.
 - Insufficient credits or plan restriction: report the returned limitation and
   let the user decide whether to top up or upgrade.
 - Validation failure: correct the template or input before retrying.
-- Version conflict: reload the project, preserve the user's intended change,
-  and save against the new version.
+- Version conflict: apply your change to the template and version the conflict
+  returned and save again, following the save rules in "Choosing between
+  delegation and authoring". Never resubmit the body you had already composed.
 - Unavailable Gateway: report that the operation did not complete; never claim
   a project, generation, save, render, or publication succeeded from a request
   attempt alone.
