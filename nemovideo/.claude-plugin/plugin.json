@@ -1,0 +1,24 @@
+{
+  "name": "nemovideo",
+  "version": "0.3.0",
+  "description": "Create and precisely edit videos with NemoVideo: author Draft Protocol V3 timelines, generate or import media, preview and export the result, and build reusable platform reference materials.",
+  "author": {
+    "name": "NemoVideo"
+  },
+  "homepage": "https://www.nemovideo.com",
+  "repository": "https://github.com/nemovideo/agent-plugins",
+  "license": "UNLICENSED",
+  "keywords": [
+    "video",
+    "ai-video",
+    "text-to-video",
+    "video-editing",
+    "draft-v3",
+    "text-to-speech",
+    "music-generation",
+    "reference-materials",
+    "render",
+    "nemovideo"
+  ],
+  "logo": "assets/logo.png"
+}

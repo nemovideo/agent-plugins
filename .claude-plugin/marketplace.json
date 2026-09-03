@@ -1,0 +1,19 @@
+{
+  "name": "nemovideo-agent-plugins",
+  "owner": {
+    "name": "NemoVideo"
+  },
+  "metadata": {
+    "description": "NemoVideo agent plugins for Cursor and other Model Context Protocol hosts"
+  },
+  "plugins": [
+    {
+      "name": "nemovideo",
+      "source": "./nemovideo",
+      "description": "Create and precisely edit videos with NemoVideo: author Draft Protocol V3 timelines, generate or import media, preview and export the result, and build reusable platform reference materials.",
+      "category": "Content Creation",
+      "homepage": "https://www.nemovideo.com",
+      "license": "UNLICENSED"
+    }
+  ]
+}
