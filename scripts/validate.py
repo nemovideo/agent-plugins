@@ -1,6 +1,9 @@
 #!/usr/bin/env python3
 """Check every plugin here against the Cursor plugin submission checklist.
 
+Also checks that the Claude Code manifests mirror the Cursor ones, since the
+same plugin ships to both hosts from duplicated manifests that can drift.
+
 Run from the repository root: python3 scripts/validate.py
 Exits non-zero on any failure so it can gate a commit or CI job.
 """
@@ -13,6 +16,9 @@ import sys
 MARKETPLACE_MANIFEST = ".cursor-plugin/marketplace.json"
 PLUGIN_MANIFEST = ".cursor-plugin/plugin.json"
 MCP_CONFIG = "mcp.json"
+CLAUDE_MARKETPLACE_MANIFEST = ".claude-plugin/marketplace.json"
+CLAUDE_PLUGIN_MANIFEST = ".claude-plugin/plugin.json"
+CLAUDE_MCP_CONFIG = ".mcp.json"
 SKILLS_DIR = "skills"
 SKILL_FILE = "SKILL.md"
 
@@ -212,9 +218,86 @@ def check_hygiene() -> None:
     ok("no symlinks and no credential-looking literals")
 
 
+def check_claude_mirror(entries: list[dict]) -> None:
+    """The Claude Code manifests must say the same thing as the Cursor ones.
+
+    Claude Code reads `.claude-plugin/` and `.mcp.json`; Cursor reads
+    `.cursor-plugin/` and `mcp.json`. The pairs are hand-maintained copies, so a
+    version bump or a server URL change applied to only one host is silent
+    breakage for the other. The only field allowed to differ is the marketplace
+    entry's `source`, which Claude Code requires to be a "./"-prefixed path.
+    """
+    print(f"== {CLAUDE_MARKETPLACE_MANIFEST} (Claude Code mirror) ==")
+    if not os.path.isfile(CLAUDE_MARKETPLACE_MANIFEST):
+        bad(f"{CLAUDE_MARKETPLACE_MANIFEST} not found; the plugin would not install in Claude Code")
+        return
+
+    claude_market = json.load(open(CLAUDE_MARKETPLACE_MANIFEST))
+    cursor_market = json.load(open(MARKETPLACE_MANIFEST))
+    ok("valid JSON")
+
+    for key in ("name", "owner", "metadata"):
+        if claude_market.get(key) != cursor_market.get(key):
+            bad(f"marketplace '{key}' differs between the Cursor and Claude Code manifests")
+    claude_entries = {entry.get("name"): entry for entry in claude_market.get("plugins") or []}
+    if set(claude_entries) != {entry.get("name") for entry in entries}:
+        bad(f"Claude Code marketplace lists {sorted(claude_entries)}, Cursor lists {sorted(e.get('name') for e in entries)}")
+        return
+    ok("marketplace header and plugin list match the Cursor manifest")
+
+    for entry in entries:
+        name = entry.get("name", "?")
+        source = entry.get("source") or name
+        claude_entry = claude_entries[name]
+
+        if claude_entry.get("source") != f"./{source.lstrip('./')}":
+            bad(f"'{name}' Claude Code source must be './{source.lstrip('./')}', got '{claude_entry.get('source')}'")
+        else:
+            ok(f"'{name}' source is a './'-prefixed path as Claude Code requires")
+
+        differing = [
+            key
+            for key in set(entry) | set(claude_entry)
+            if key != "source" and entry.get(key) != claude_entry.get(key)
+        ]
+        if differing:
+            bad(f"'{name}' marketplace entry differs on {sorted(differing)} between the two hosts")
+        else:
+            ok(f"'{name}' marketplace entry otherwise matches the Cursor entry")
+
+        check_mirrored_file(
+            os.path.join(source, PLUGIN_MANIFEST),
+            os.path.join(source, CLAUDE_PLUGIN_MANIFEST),
+            required=True,
+        )
+        check_mirrored_file(
+            os.path.join(source, MCP_CONFIG),
+            os.path.join(source, CLAUDE_MCP_CONFIG),
+            required=False,
+        )
+
+
+def check_mirrored_file(cursor_path: str, claude_path: str, required: bool) -> None:
+    if not os.path.isfile(cursor_path):
+        if os.path.isfile(claude_path):
+            bad(f"{claude_path} exists but {cursor_path} does not")
+        elif required:
+            bad(f"{cursor_path} not found")
+        return
+    if not os.path.isfile(claude_path):
+        bad(f"{claude_path} not found; Claude Code does not read {cursor_path}")
+        return
+    if json.load(open(cursor_path)) == json.load(open(claude_path)):
+        ok(f"{claude_path} mirrors {cursor_path}")
+    else:
+        bad(f"{claude_path} has drifted from {cursor_path}")
+
+
 def main() -> int:
-    for entry in check_marketplace():
+    entries = check_marketplace()
+    for entry in entries:
         check_plugin(entry)
+    check_claude_mirror(entries)
     check_hygiene()
     print(f"\nRESULT: {len(failures)} failure(s)")
     return 1 if failures else 0

@@ -17,7 +17,7 @@ NemoVideo drafts are Draft Protocol V3 markup rather than an opaque render, so
 | `skills/nemovideo` | The ordinary project workflow: create a project, import or generate media, save, preview, export, and read credits — and when to hand the whole job to NemoVideo's own agent instead |
 | `skills/draft-v3-authoring` | Draft Protocol V3 itself — timelines, clips, tracks, subtitles, transitions, editable data and render components, and repairing a save that failed validation |
 | `skills/platform-reference-materials` | Reusable reference materials: create, attach, preview, publish, roll back, unpublish |
-| `mcp.json` | Declares the NemoVideo remote MCP server (Streamable HTTP) |
+| `mcp.json` / `.mcp.json` | Declares the NemoVideo remote MCP server (Streamable HTTP) — same content, one file name per host |
 
 There is no bundled runtime: no local command, no npm or pip dependency, no
 background process. The plugin is a manifest plus documentation, so it works on
@@ -30,13 +30,29 @@ script; a change made here would be overwritten on the next import.
 
 ## Install
 
+### Cursor
+
 **From the Cursor marketplace** — open **Customize** in the sidebar, find
 NemoVideo, and click install.
 
 **With an install link** — [Add to Cursor](https://cursor.com/install-mcp?name=nemovideo&config=eyJ1cmwiOiJodHRwczovL3d3dy5uZW1vdmlkZW8uY29tL21jcCJ9)
 
-**Manually** — add this to `~/.cursor/mcp.json` for every project, or
-`.cursor/mcp.json` for one project:
+### Claude Code
+
+Add this repository as a marketplace, then install the plugin from it:
+
+```bash
+claude plugin marketplace add nemovideo/agent-plugins
+claude plugin install nemovideo@nemovideo-agent-plugins
+```
+
+Restart the session to load it. `claude plugin details nemovideo` should report
+three skills and one MCP server.
+
+### Manually, without the plugin
+
+Add this to `~/.cursor/mcp.json` for every project, or `.cursor/mcp.json` for one
+project (in Claude Code, `claude mcp add --transport http nemovideo https://www.nemovideo.com/mcp`):
 
 ```json
 {
@@ -48,7 +64,7 @@ NemoVideo, and click install.
 }
 ```
 
-The manual route gives you the tools but not the skill. Install the plugin to
+The manual route gives you the tools but not the skills. Install the plugin to
 get both.
 
 ## Signing in
@@ -104,8 +120,8 @@ yourself with `save_v3_draft`.
 
 `preview_video` returns an interactive player through the
 [MCP Apps extension](https://modelcontextprotocol.io/extensions/apps/overview),
-which Cursor renders inline. On a host that cannot render app UI the same tool
-still returns a usable text result.
+which Cursor renders inline. On a host that cannot render app UI — Claude Code
+included — the same tool still returns a usable text result.
 
 ## Known limitations
 
