@@ -16,7 +16,7 @@ NemoVideo drafts are Draft Protocol V3 markup rather than an opaque render, so
 |-|-|
 | `skills/nemovideo` | The ordinary project workflow: create a project, import or generate media, save, preview, export, and read credits — and when to hand the whole job to NemoVideo's own agent instead |
 | `skills/draft-v3-authoring` | Draft Protocol V3 itself — timelines, clips, tracks, subtitles, transitions, editable data and render components, and repairing a save that failed validation |
-| `skills/platform-reference-materials` | Reusable reference materials: create, attach, preview, publish, roll back, unpublish |
+| `skills/platform-reference-materials` | Reusable reference materials: write material that stands on its own, create, preview (player or page link), attach, read back and update, publish, roll back, unpublish |
 | `mcp.json` / `.mcp.json` | Declares the NemoVideo remote MCP server (Streamable HTTP) — same content, one file name per host |
 
 There is no bundled runtime: no local command, no npm or pip dependency, no
@@ -103,10 +103,23 @@ use. Revoke access at any time from your NemoVideo account settings, or with
 | `delegate_to_nemo_agent` | Hand the whole video task to NemoVideo's own agent | `agent:chat` |
 | `get_nemo_agent_turn` | Read a delegated turn: its events, the tools it ran, whether it stopped | `agent:chat` |
 | `cancel_nemo_agent_turn` | Cancel a delegated turn that is still running | `agent:chat` |
+| `review_v3_draft` | Bounded representative frames of the saved draft, for self-review | `video:read` |
+| `resolve_project_resource_versions` | The exact resource versions a project's draft pins | `video:read` |
+| `search_resources` | Find reusable reference material by metadata | `platform:read` |
+| `get_platform_resource` | Read the newest version of a Platform resource: body, title, tags, update coordinates | `platform:read` |
+| `preview_platform_resource` | Play one resource version on its own, as an inline player or a workspace page link | `platform:read` |
+| `list_resource_publications` | Publication records and the revision a publish/rollback/unpublish must pass | `platform:read` |
+| `create_platform_resources` | Create reusable Platform reference material, or append a version to it | `platform:write` |
+| `attach_platform_resource` | Bind one exact resource version to a project and get its `use_node` | `platform:write` |
+| `publish_platform_resource` | Publish one version to the deployment's public catalog | `platform:publish` |
+| `rollback_platform_resource` | Return the catalog to the previously published version | `platform:publish` |
+| `unpublish_platform_resource` | Remove a resource from the catalog (versions stay readable) | `platform:publish` |
 
 The three `agent:chat` tools appear only when the connected account granted that
 scope, so most sessions will not see them and the skill falls back to authoring
-the draft directly. When they are available, describing a video is usually
+the draft directly. The nine `platform:*` tools appear only for accounts with a
+Platform creator role; when they are absent, `skills/platform-reference-materials`
+tells the agent to stop rather than work around it. When they are available, describing a video is usually
 better than writing the markup yourself: NemoVideo's agent plans the video,
 authors and saves the draft, places or generates the media, and checks its own
 result. Author the draft yourself for an edit you can already express exactly.
