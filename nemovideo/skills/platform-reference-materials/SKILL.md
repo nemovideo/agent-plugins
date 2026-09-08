@@ -132,9 +132,11 @@ not create a second resource merely because the material changed. Existing
 projects remain pinned to their earlier immutable versions until deliberately
 attached and saved with the new version.
 
-After creating a new version, repeat the attach, save, and preview sequence
-with the new returned version triple and digest before describing the update
-as verified in a project.
+A new version is material like any other: preview it on its own first and
+wait for the user's explicit confirmation of that exact version in a new
+message. Only when a project needs the update as well, repeat the attach,
+save, and preview sequence with the new version triple and digest; do not
+describe the update as verified in a project before that.
 
 ## Publish and publication changes
 
