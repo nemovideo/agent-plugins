@@ -11,7 +11,7 @@ manifests, skills and brand assets used to install and drive it.
 
 | Plugin | Description |
 |-|-|
-| [`nemovideo`](./nemovideo) | Create, edit, preview and export videos. One skill plus twelve MCP tools. |
+| [`nemovideo`](./nemovideo) | Create, edit, preview and export videos, and build reusable reference materials. Three skills plus twenty-six MCP tools. |
 
 ## Repository layout
 
