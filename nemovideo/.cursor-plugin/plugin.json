@@ -1,6 +1,6 @@
 {
   "name": "nemovideo",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Create and precisely edit videos with NemoVideo: author Draft Protocol V3 timelines, generate or import media, preview and export the result, and build reusable platform reference materials.",
   "author": {
     "name": "NemoVideo"
