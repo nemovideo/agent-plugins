@@ -138,6 +138,32 @@ message. Only when a project needs the update as well, repeat the attach,
 save, and preview sequence with the new version triple and digest; do not
 describe the update as verified in a project before that.
 
+## Material the user edited in place
+
+A `<use>` element in a project's draft that carries `override` and has
+children is the user's own edit of the material placed there: those children
+are what renders, and the pin attributes stay only to record where the
+material came from. Leave it exactly as it is during unrelated work. Do not
+strip `override`, remove or rewrite the children, hand-edit the pin, or turn
+it back into a self-closing `<use />`; each of those silently discards an edit
+the user made.
+
+Persist such an edit only when the user asks to keep, save, or reuse it, never
+as a side effect of another task. Read the resource back with
+`get_platform_resource` and act on the `is_owner` it returns:
+
+- `is_owner` true: append those children as a new version of that resource,
+  following Update above.
+- `is_owner` false: create a new resource whose body is those children, with
+  its own title, `type_key` and tags.
+- Ownership not reported at all: do neither. Read again or ask the user; a
+  guess here either duplicates material the user owns or writes to material
+  they do not.
+
+The body is the children alone — a body that contains a `<use>` is refused —
+and afterwards the whole `<use … override>…</use>` element is replaced by the
+`use_node` the call returns, then the draft is saved.
+
 ## Publish and publication changes
 
 Publishing changes the deployment's public `CATALOG`; it is separate from
